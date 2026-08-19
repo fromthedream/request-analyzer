@@ -1,0 +1,32 @@
+services:
+  python:
+    build: ./python
+    container_name: request-analyzer-python
+    ports:
+      - "8000:8000"
+
+  postgres:
+    image: postgres:16
+    container_name: request-analyzer-postgres
+    environment:
+      POSTGRES_DB: request_analyzer
+      POSTGRES_USER: analyzer
+      POSTGRES_PASSWORD: analyzer_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  postgres_data:
+  n8n_data:
+    external: true
+    name: n8n_data

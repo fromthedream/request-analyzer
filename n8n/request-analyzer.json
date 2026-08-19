@@ -1,0 +1,454 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        -96
+      ],
+      "id": "f34252c7-9020-413f-876e-2fddd5e0e83d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"name\": \"Anton\",\n  \"message\": \"Не могу войти в личный кабинет, уже третий раз сбрасываю пароль, ничего не помогает.\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -288,
+        80
+      ],
+      "id": "7b1b3c52-dd8a-43ad-86f4-6aa12f7519c2",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/analyze",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=name",
+              "value": "={{ $json.body.name }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.body.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        208,
+        -112
+      ],
+      "id": "f631a43f-4ef1-4e76-996b-2e2551f24f25",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "14dd1690-8e1a-4676-8ed8-003fb49b1c30",
+              "leftValue": "={{$json.valid}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        -112
+      ],
+      "id": "e980c830-8c48-4438-99aa-d7a15894b5c7",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"qwen3:8b\",\n  \"prompt\": \"проанализируй обращение клиента. верни только json с полями category, priority (low|medium|high), sentiment (positive|neutral|negative), summary и action. не добавляй markdown и пояснения. category должна быть краткой. summary — одно предложение. action — одно конкретное действие.\\n\\nклиент: {{$json.name}}\\nобращение: {{$json.message}}\",\n  \"stream\": false,\n  \"format\": \"json\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        -352
+      ],
+      "id": "a64c0a1b-0699-4593-ac69-1147a3709b70",
+      "name": "Analyze with AI"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const analysis = JSON.parse(item.json.response);\n\n  return {\n    json: {\n      ...analysis\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -352
+      ],
+      "id": "75fd8203-261e-4922-a9e0-04789e4f0382",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "91e5cf6f-51e4-4d5a-880a-5a65de88673f",
+              "name": "name",
+              "value": "={{ $json.data.name }}",
+              "type": "string"
+            },
+            {
+              "id": "3857f9da-bce0-4d60-a3fc-9a3c57a24b47",
+              "name": "message",
+              "value": "={{ $json.data.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        720,
+        -144
+      ],
+      "id": "cef29103-17b1-4552-8259-f567277a3087",
+      "name": "Save requests"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1152,
+        -160
+      ],
+      "id": "379f716c-f87b-4eec-a8a0-095d8313ca83",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "request-analyzer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -256,
+        -304
+      ],
+      "id": "07ec8d6d-7830-47ea-8ce2-1ab408558fd4",
+      "name": "Webhook",
+      "webhookId": "33b9eb6b-1e33-4062-8d79-d60d508fcef1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"category\": \"{{ $json.category }}\",\n  \"priority\": \"{{ $json.priority }}\",\n  \"sentiment\": \"{{ $json.sentiment }}\",\n  \"summary\": \"{{ $json.summary }}\",\n  \"action\": \"{{ $json.action }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2240,
+        64
+      ],
+      "id": "5901a0f2-1e2f-4bb4-b878-f2bce0fe8f3a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      category: $json.category,\n      priority: $json.priority,\n      sentiment: $json.sentiment,\n      summary: $json.summary,\n      action: $json.action,\n      name: $json.name,\n      message: $json.message\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        0
+      ],
+      "id": "1054ae4e-4fd3-4064-800f-245225c6d420",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://python:8000/requests",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{$json.name}}"
+            },
+            {
+              "name": "message",
+              "value": "={{$json.message}}"
+            },
+            {
+              "name": "text_length",
+              "value": "={{$json.text_length}}"
+            },
+            {
+              "name": "word_count",
+              "value": "={{$json.word_count}}"
+            },
+            {
+              "name": "category",
+              "value": "={{$json.category}}"
+            },
+            {
+              "name": "priority",
+              "value": "={{$json.priority}}"
+            },
+            {
+              "name": "sentiment",
+              "value": "={{$json.sentiment}}"
+            },
+            {
+              "name": "summary",
+              "value": "={{$json.summary}}"
+            },
+            {
+              "name": "action",
+              "value": "={{$json.action}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1424,
+        96
+      ],
+      "id": "62580bf3-9d11-47e5-96ff-63a02aea19dd",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1632,
+        -64
+      ],
+      "id": "70eaeb4e-68b1-42d8-9d24-50233d8da5a0",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      name: $json.name,\n      message: $json.message,\n      text_length: $json.message.length,\n      word_count: $json.message.trim().split(/\\s+/).length,\n      category: $json.category,\n      priority: $json.priority,\n      sentiment: $json.sentiment,\n      summary: $json.summary,\n      action: $json.action\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        96
+      ],
+      "id": "44cd58bb-80fa-4cfe-8bd7-d74bd6274355",
+      "name": "Prepare DB Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        []
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Save requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze with AI": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save requests": {
+      "main": [
+        [
+          {
+            "node": "Analyze with AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare DB Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare DB Request": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "36fab631-29cc-4134-903a-735fc17c76a5",
+  "meta": {
+    "instanceId": "b7ecf48c0c97e072fe7ecf13fee61ca8a7c630785127ef578658604a9c291968"
+  },
+  "nodeGroups": [],
+  "id": "IVgb6AWum4YcVZBO",
+  "tags": []
+}

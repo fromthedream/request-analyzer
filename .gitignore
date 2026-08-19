@@ -31,3 +31,6 @@ postgres_data/
 
 # n8n
 n8n_data/
+
+# SQLite
+test.db

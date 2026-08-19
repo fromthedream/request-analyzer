@@ -81,7 +81,7 @@ FastAPI /analyze    FastAPI /requests
 Клонировать репозиторий:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/fromthedream/request-analyzer.git
 cd request-analyzer
 ```
 

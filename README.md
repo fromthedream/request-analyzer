@@ -44,7 +44,7 @@ FastAPI /analyze    FastAPI /requests
 
 ### Анализ обращений
 
-![Анализ обращений](screenshots/analyzer.png)
+![Анализ обращений](screenshots/Analyzer.png)
 
 ### История обращений
 

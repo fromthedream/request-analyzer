@@ -40,6 +40,19 @@ FastAPI /analyze    FastAPI /requests
                           v
                   История обращений
 ```
+## Интерфейс
+
+### Анализ обращений
+
+![Анализ обращений](screenshots/analyzer.png)
+
+### История обращений
+
+![История обращений](screenshots/history.png)
+
+### n8n Workflow
+
+![n8n Workflow](screenshots/n8n-workflow.png)
 
 ## Технологии
 

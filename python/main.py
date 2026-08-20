@@ -96,22 +96,52 @@ def root():
 
         const result = await response.json();
 
-        document.getElementById("result").innerHTML = `
-    <h2>Результат анализа</h2>
+        const resultContainer = document.getElementById("result");
+        resultContainer.replaceChildren();
 
-    <p><strong>Категория:</strong> ${result.category}</p>
-    <p><strong>Приоритет:</strong> ${result.priority}</p>
-    <p><strong>Тональность:</strong> ${result.sentiment}</p>
+        const resultTitle = document.createElement("h2");
+        resultTitle.textContent = "Результат анализа";
+        resultContainer.appendChild(resultTitle);
 
-    <h3>Резюме</h3>
-    <p>${result.summary}</p>
+        function appendLabeledParagraph(label, value) {
+            const paragraph = document.createElement("p");
+            const labelElement = document.createElement("strong");
 
-    <h3>Действие</h3>
-    <p>${result.action}</p>
+            labelElement.textContent = `${label}:`;
+            paragraph.append(labelElement, document.createTextNode(` ${value}`));
+            resultContainer.appendChild(paragraph);
+        }
 
-    <h3>Исходное обращение</h3>
-    <p><strong>${result.name}</strong>: ${result.message}</p>
-`;
+        appendLabeledParagraph("Категория", result.category);
+        appendLabeledParagraph("Приоритет", result.priority);
+        appendLabeledParagraph("Тональность", result.sentiment);
+
+        const summaryTitle = document.createElement("h3");
+        summaryTitle.textContent = "Резюме";
+        resultContainer.appendChild(summaryTitle);
+
+        const summary = document.createElement("p");
+        summary.textContent = result.summary;
+        resultContainer.appendChild(summary);
+
+        const actionTitle = document.createElement("h3");
+        actionTitle.textContent = "Действие";
+        resultContainer.appendChild(actionTitle);
+
+        const action = document.createElement("p");
+        action.textContent = result.action;
+        resultContainer.appendChild(action);
+
+        const originalRequestTitle = document.createElement("h3");
+        originalRequestTitle.textContent = "Исходное обращение";
+        resultContainer.appendChild(originalRequestTitle);
+
+        const originalRequest = document.createElement("p");
+        const originalName = document.createElement("strong");
+
+        originalName.textContent = result.name;
+        originalRequest.append(originalName, document.createTextNode(`: ${result.message}`));
+        resultContainer.appendChild(originalRequest);
     });
 </script>
     </body>
@@ -268,52 +298,62 @@ def requests_page():
                     return;
                 }
 
-                container.innerHTML = requests.map(request => `
-                    <div class="request">
+                container.replaceChildren();
 
-                        <div class="header">
-                            <div class="name">
-                                ${request.name}
-                            </div>
+                function createTag(label, value) {
+                    const tag = document.createElement("span");
+                    tag.className = "tag";
+                    tag.textContent = `${label}: ${value}`;
+                    return tag;
+                }
 
-                            <div class="date">
-                                ${new Date(request.created_at).toLocaleString("ru-RU")}
-                            </div>
-                        </div>
+                function createLabeledBlock(label, value, className) {
+                    const block = document.createElement("div");
+                    const labelElement = document.createElement("span");
 
-                        <div class="meta">
-                            <span class="tag">
-                                Категория: ${request.category}
-                            </span>
+                    if (className) {
+                        block.className = className;
+                    }
 
-                            <span class="tag">
-                                Приоритет: ${request.priority}
-                            </span>
+                    labelElement.className = "label";
+                    labelElement.textContent = `${label}:`;
+                    block.append(labelElement, document.createTextNode(` ${value}`));
+                    return block;
+                }
 
-                            <span class="tag">
-                                Тональность: ${request.sentiment}
-                            </span>
-                        </div>
+                requests.forEach(request => {
+                    const card = document.createElement("div");
+                    card.className = "request";
 
-                        <div class="message">
-                            <span class="label">Обращение:</span>
-                            ${request.message}
-                        </div>
+                    const header = document.createElement("div");
+                    header.className = "header";
 
-                        <div>
-                            <span class="label">Резюме:</span>
-                            ${request.summary}
-                        </div>
+                    const name = document.createElement("div");
+                    name.className = "name";
+                    name.textContent = request.name;
 
-                        <br>
+                    const date = document.createElement("div");
+                    date.className = "date";
+                    date.textContent = new Date(request.created_at).toLocaleString("ru-RU");
 
-                        <div>
-                            <span class="label">Рекомендуемое действие:</span>
-                            ${request.action}
-                        </div>
+                    header.append(name, date);
 
-                    </div>
-                `).join("");
+                    const meta = document.createElement("div");
+                    meta.className = "meta";
+                    meta.append(
+                        createTag("Категория", request.category),
+                        createTag("Приоритет", request.priority),
+                        createTag("Тональность", request.sentiment)
+                    );
+
+                    const message = createLabeledBlock("Обращение", request.message, "message");
+                    const summary = createLabeledBlock("Резюме", request.summary);
+                    const action = createLabeledBlock("Рекомендуемое действие", request.action);
+                    const separator = document.createElement("br");
+
+                    card.append(header, meta, message, summary, separator, action);
+                    container.appendChild(card);
+                });
             }
 
             loadRequests();

@@ -12,8 +12,6 @@ services:
       POSTGRES_DB: request_analyzer
       POSTGRES_USER: analyzer
       POSTGRES_PASSWORD: analyzer_password
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

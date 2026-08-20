@@ -267,6 +267,7 @@ request-analyzer/
 │   ├── Analyzer.png
 │   ├── history.png
 │   └── n8n-workflow.png
+├── .gitignore
 ├── docker-compose.yml
 └── README.md
 ```
@@ -277,10 +278,12 @@ request-analyzer/
 * **`n8n/`** — экспортированный workflow автоматизации.
 * **`tests/`** — тесты API.
 * **`screenshots/`** — скриншоты интерфейса и workflow.
+* **`.gitignore`** — список файлов и директорий, исключённых из Git.
 * **`docker-compose.yml`** — конфигурация Docker-контейнеров.
 * **`README.md`** — документация проекта.
 
 Workflow `n8n/request-analyzer.json` можно импортировать в n8n для просмотра и запуска автоматизации.
+
 
 
 ## Пример результата

@@ -178,33 +178,74 @@ AI используется для:
 
 ## Запуск
 
-Для запуска проекта требуется Docker Desktop.
+Для запуска проекта требуется Docker Desktop и Ollama.
 
-Клонировать репозиторий:
+### 1. Установка Ollama
+
+AI-анализ выполняется локально через Ollama, запущенную непосредственно на Windows.
+
+После установки загрузите модель Qwen3:8B:
+
+```bash
+ollama pull qwen3:8b
+```
+
+Проверить наличие модели:
+
+```bash
+ollama list
+```
+
+Ollama должна быть запущена во время работы проекта, так как n8n обращается к ней для выполнения AI-анализа.
+
+### 2. Адрес Ollama для n8n
+
+Поскольку n8n работает внутри Docker-контейнера, а Ollama запущена на Windows, для обращения к Ollama из n8n используется следующий адрес:
+
+```text
+http://host.docker.internal:11434/api/generate
+```
+
+Этот адрес необходимо указать в HTTP Request node в n8n.
+
+`host.docker.internal` позволяет Docker-контейнеру обращаться к сервисам, запущенным на хост-системе.
+
+### 3. Клонирование репозитория
 
 ```bash
 git clone https://github.com/fromthedream/request-analyzer.git
 cd request-analyzer
 ```
 
-Запустить контейнеры:
+### 4. Запуск проекта
+
+Запустить контейнеры через Docker Compose:
 
 ```bash
 docker compose up -d --build
 ```
 
-После запуска:
+После запуска доступны:
 
 * Анализатор: `http://localhost:8000`
 * История обращений: `http://localhost:8000/requests-page`
 * FastAPI Swagger: `http://localhost:8000/docs`
 * n8n: `http://localhost:5678`
 
-Остановить проект:
+### 5. Остановка проекта
+
+Для остановки контейнеров:
 
 ```bash
 docker compose down
 ```
+
+Чтобы снова запустить проект после остановки:
+
+```bash
+docker compose up -d
+```
+
 
 ## Структура проекта
 

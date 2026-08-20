@@ -257,6 +257,8 @@ request-analyzer/
 │   ├── models.py
 │   ├── requirements.txt
 │   └── Dockerfile
+├── n8n/
+│   └── request-analyzer.json
 ├── tests/
 │   ├── conftest.py
 │   ├── test_analyze.py
@@ -268,6 +270,18 @@ request-analyzer/
 ├── docker-compose.yml
 └── README.md
 ```
+
+### Основные компоненты
+
+* **`python/`** — FastAPI backend, модели данных и подключение к PostgreSQL.
+* **`n8n/`** — экспортированный workflow автоматизации.
+* **`tests/`** — тесты API.
+* **`screenshots/`** — скриншоты интерфейса и workflow.
+* **`docker-compose.yml`** — конфигурация Docker-контейнеров.
+* **`README.md`** — документация проекта.
+
+Workflow `n8n/request-analyzer.json` можно импортировать в n8n для просмотра и запуска автоматизации.
+
 
 ## Пример результата
 

@@ -9,10 +9,13 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   authapi:
     build:
-      context: ../dev/AuthApi
+      context: ./authapi
       dockerfile: Dockerfile
     container_name: request-analyzer-authapi
     environment:

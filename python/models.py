@@ -1,7 +1,9 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy.sql import func
 from datetime import datetime
 
 from database import Base
+from pgvector.sqlalchemy import VECTOR
 
 
 class Request(Base):
@@ -22,3 +24,33 @@ class Request(Base):
 
     summary = Column(Text, nullable=False)
     action = Column(Text, nullable=False)
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+
+    id = Column(Integer, primary_key=True)
+
+    document_name = Column(
+        String(255),
+        nullable=False
+    )
+
+    chunk_index = Column(
+        Integer,
+        nullable=False
+    )
+
+    content = Column(
+        Text,
+        nullable=False
+    )
+
+    embedding = Column(
+        VECTOR(768)
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )

@@ -31,7 +31,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: request-analyzer-postgres
     environment:
       POSTGRES_DB: request_analyzer

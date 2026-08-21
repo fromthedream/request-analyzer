@@ -1,5 +1,6 @@
 # Visual Studio
 .vs/
+.vscode/
 
 # Python
 __pycache__/
@@ -37,3 +38,6 @@ test.db
 
 # Local HTTP requests
 test.http
+
+# Database backups
+backup.sql

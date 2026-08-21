@@ -34,3 +34,6 @@ n8n_data/
 
 # SQLite
 test.db
+
+# Local HTTP requests
+test.http

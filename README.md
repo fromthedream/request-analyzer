@@ -1,342 +1,297 @@
 # Request Analyzer
 
-Сервис для автоматического анализа обращений пользователей с использованием **n8n и локальной LLM Qwen3:8B**.
-
-Пользователь отправляет имя и текст обращения. Workflow в n8n принимает запрос через Webhook, передаёт обращение на AI-анализ, получает результат, сохраняет его вместе с исходными данными в PostgreSQL и возвращает пользователю результат.
-
-AI определяет категорию, приоритет и тональность обращения, формирует краткое резюме и рекомендуемое действие.
-
-## Возможности
-
-* Приём обращений пользователей через Webhook
-* Автоматизация обработки обращений в n8n
-* AI-анализ текста с использованием Qwen3:8B
-* Запуск локальной LLM через Ollama
-* Определение категории обращения
-* Определение приоритета
-* Определение тональности
-* Формирование краткого резюме
-* Формирование рекомендуемого действия
-* Валидация и обработка данных
-* Сохранение обращений и результатов анализа в PostgreSQL
-* Просмотр истории обращений
-* REST API на FastAPI
-* Тестирование API с помощью pytest
-* Запуск сервисов через Docker Compose
+Request Analyzer — система автоматического анализа пользовательских обращений с использованием n8n, локальной LLM и PostgreSQL. Проект запускается через Docker Compose и объединяет Python API, AuthApi, n8n и один контейнер PostgreSQL.
 
 ## Архитектура
 
-                         ┌──────────────────┐
-                         │    Пользователь  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │   Web UI         │
-                         │ HTML / JavaScript│
-                         └────────┬─────────┘
-                                  │
-                                  │ POST
-                                  ▼
-                         ┌──────────────────┐
-                         │   n8n Webhook    │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Подготовка JSON  │
-                         │ / валидация      │
-                         └────────┬─────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    ▼                           ▼
-          ┌──────────────────┐        ┌──────────────────┐
-          │ Исходные данные  │        │    AI-анализ     │
-          │ name + message   │        │ Ollama + Qwen3:8B│
-          └────────┬─────────┘        └────────┬─────────┘
-                   │                           │
-                   │                           ▼
-                   │                  ┌──────────────────┐
-                   │                  │ Результат AI     │
-                   │                  │ category         │
-                   │                  │ priority         │
-                   │                  │ sentiment        │
-                   │                  │ summary          │
-                   │                  │ action            │
-                   │                  └────────┬─────────┘
-                   │                           │
-                   └─────────────┬─────────────┘
-                                 ▼
-                         ┌──────────────────┐
-                         │      Merge       │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │     FastAPI      │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │   PostgreSQL     │
-                         └──────────────────┘
-                                  │
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Respond Webhook  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │    Пользователь  │
-                         └──────────────────┘
-
-n8n используется как основной слой автоматизации и оркестрации workflow.
-
-FastAPI отвечает за backend API и взаимодействие с PostgreSQL.
-
-Ollama используется для локального запуска модели **Qwen3:8B**, которая выполняет анализ естественного языка.
-
-## AI
-
-Для анализа обращений используется локальная LLM **Qwen3:8B**, запущенная через **Ollama**.
-
-Модель получает текст обращения и формирует результат анализа:
-
 ```text
-category
-priority
-sentiment
-summary
-action
+Browser
+  |
+  | POST /webhook/request-analyzer
+  v
+n8n Webhook
+  |
+  | POST /analyze + Authorization
+  v
+Python API (FastAPI)
+  |
+  +--> n8n -> Ollama / qwen3:8b -> анализ обращения
+  |
+  +--> POST /requests -> PostgreSQL request_analyzer
+  |
+  +--> GET /requests <- Authorization JWT
+
+Browser -- login --> AuthApi -- EF Core --> PostgreSQL authapi
 ```
 
-AI используется для:
+- **n8n** принимает обращение через Webhook, передаёт его на Python API, запускает AI-анализ через Ollama и сохраняет результат.
+- **Python API** валидирует входные данные, обслуживает веб-интерфейс, сохраняет обращения и отдаёт историю.
+- **AuthApi** отвечает за регистрацию, login, access/refresh tokens, JWT-проверку и профиль пользователя.
+- **PostgreSQL** работает одним контейнером с двумя базами: `request_analyzer` и `authapi`.
+- **Docker Compose** подключает все контейнеры к общей внутренней сети. AuthApi и Python ждут `service_healthy` для PostgreSQL.
 
-* определения категории обращения;
-* определения приоритета;
-* анализа тональности;
-* формирования краткого резюме;
-* рекомендации дальнейшего действия.
-
-Интеграция AI выполняется через n8n. После получения результата он объединяется с исходными данными обращения и передаётся дальше по workflow для сохранения в PostgreSQL.
-
-Использование локальной модели позволяет выполнять анализ без передачи текста обращений во внешний облачный AI-сервис.
-
-## Интерфейс
-
-### Анализ обращений
-
-![Анализ обращений](screenshots/Analyzer.png)
-
-### История обращений
-
-![История обращений](screenshots/history.png)
-
-### n8n Workflow
-
-![n8n Workflow](screenshots/n8n-workflow.png)
-
-## Технологии
-
-* Python 3.12
-* FastAPI
-* Pydantic
-* SQLAlchemy
-* PostgreSQL 16
-* n8n
-* Ollama
-* Qwen3:8B
-* Docker
-* Docker Compose
-* HTML / CSS / JavaScript
-* pytest
-
-## API
-
-### GET `/`
-
-Основная страница анализатора обращений.
-
-### POST `/analyze`
-
-Принимает обращение и выполняет базовую обработку входных данных.
-
-### POST `/requests`
-
-Сохраняет обращение и результат анализа в PostgreSQL.
-
-### GET `/requests`
-
-Возвращает список сохранённых обращений.
-
-### GET `/requests-page`
-
-Веб-страница с историей обращений.
-
-## Запуск
-
-Для запуска проекта требуется Docker Desktop и Ollama.
-
-### 1. Установка Ollama
-
-AI-анализ выполняется локально через Ollama, запущенную непосредственно на Windows.
-
-После установки загрузите модель Qwen3:8B:
-
-```bash
-ollama pull qwen3:8b
-```
-
-Проверить наличие модели:
-
-```bash
-ollama list
-```
-
-Ollama должна быть запущена во время работы проекта, так как n8n обращается к ней для выполнения AI-анализа.
-
-### 2. Адрес Ollama для n8n
-
-Поскольку n8n работает внутри Docker-контейнера, а Ollama запущена на Windows, для обращения к Ollama из n8n используется следующий адрес:
-
-```text
-http://host.docker.internal:11434/api/generate
-```
-
-Этот адрес необходимо указать в HTTP Request node в n8n.
-
-`host.docker.internal` позволяет Docker-контейнеру обращаться к сервисам, запущенным на хост-системе.
-
-### 3. Клонирование репозитория
-
-```bash
-git clone https://github.com/fromthedream/request-analyzer.git
-cd request-analyzer
-```
-
-### 4. Запуск проекта
-
-Запустить контейнеры через Docker Compose:
-
-```bash
-docker compose up -d --build
-```
-
-После запуска доступны:
-
-* Анализатор: `http://localhost:8000`
-* История обращений: `http://localhost:8000/requests-page`
-* FastAPI Swagger: `http://localhost:8000/docs`
-* n8n: `http://localhost:5678`
-
-### 5. Остановка проекта
-
-Для остановки контейнеров:
-
-```bash
-docker compose down
-```
-
-Чтобы снова запустить проект после остановки:
-
-```bash
-docker compose up -d
-```
-
-
-## Структура проекта
+## Структура репозитория
 
 ```text
 request-analyzer/
+├── authapi/
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── AuthApi.csproj
+│   ├── Program.cs
+│   ├── Data/
+│   ├── Migrations/
+│   ├── Models/
+│   ├── Services/
+│   └── Properties/
 ├── python/
+│   ├── Dockerfile
 │   ├── main.py
 │   ├── database.py
 │   ├── models.py
-│   ├── requirements.txt
-│   └── Dockerfile
+│   └── requirements.txt
 ├── n8n/
 │   └── request-analyzer.json
+├── init-db/
+│   └── 01-create-authapi.sql
 ├── tests/
 │   ├── conftest.py
 │   ├── test_analyze.py
 │   └── test_requests.py
 ├── screenshots/
-│   ├── Analyzer.png
-│   ├── history.png
-│   └── n8n-workflow.png
-├── .gitignore
 ├── docker-compose.yml
+├── .gitignore
 └── README.md
 ```
 
-### Основные компоненты
+## Технологический стек
 
-* **`python/`** — FastAPI backend, модели данных и подключение к PostgreSQL.
-* **`n8n/`** — экспортированный workflow автоматизации.
-* **`tests/`** — тесты API.
-* **`screenshots/`** — скриншоты интерфейса и workflow.
-* **`.gitignore`** — список файлов и директорий, исключённых из Git.
-* **`docker-compose.yml`** — конфигурация Docker-контейнеров.
-* **`README.md`** — документация проекта.
+- C# / ASP.NET Core / .NET 10;
+- Entity Framework Core 10;
+- PostgreSQL 16;
+- JWT с алгоритмом HS256;
+- BCrypt для хеширования паролей;
+- Python 3.12;
+- FastAPI, Uvicorn, Pydantic, SQLAlchemy;
+- n8n;
+- Ollama и модель `qwen3:8b`;
+- Docker и Docker Compose;
+- pytest.
 
-Workflow `n8n/request-analyzer.json` можно импортировать в n8n для просмотра и запуска автоматизации.
+## Возможности
 
+- регистрация пользователя и вход через AuthApi;
+- выдача и обновление access token;
+- отзыв refresh token;
+- защищённый профиль пользователя;
+- HTML-интерфейс анализа обращений;
+- передача JWT из браузера в n8n и далее в Python `/analyze`;
+- проверка входного обращения;
+- определение категории, приоритета и тональности через локальную LLM;
+- формирование резюме и рекомендуемого действия;
+- сохранение обращения и результата в PostgreSQL;
+- просмотр истории обращений;
+- автоматизация workflow через n8n;
+- API-тесты на pytest.
 
+## Запуск через Docker Compose
 
-## Пример результата
+### Prerequisites
 
-### Вход
+Для запуска нужны:
 
-```text
-Имя: Антон
+- Docker Desktop с Docker Compose;
+- Ollama, запущенная на хост-системе;
+- модель Ollama `qwen3:8b`.
 
-Обращение:
-Не могу войти в личный кабинет, пароль не помогает
-```
-
-### Результат
-
-```json
-{
-  "category": "авторизация",
-  "priority": "high",
-  "sentiment": "negative",
-  "summary": "Клиент не может войти в личный кабинет, пароль не работает",
-  "action": "Проверить учетную запись клиента и сбросить пароль."
-}
-```
-
-## Тестирование
-
-Для API написаны тесты с использованием pytest.
-
-Запуск:
+Загрузка модели:
 
 ```bash
-pytest
+ollama pull qwen3:8b
 ```
 
-Тесты проверяют:
+n8n обращается к Ollama через `http://host.docker.internal:11434/api/generate`. Этот адрес уже указан в workflow.
 
-* обработку входных данных;
-* создание обращения;
-* получение истории обращений;
-* обязательность полей API.
+### Переменные окружения
 
-## Что демонстрирует проект
+Создайте локальный `.env` в корне репозитория. Реальные значения не должны попадать в Git.
 
-Проект демонстрирует практическое использование **n8n для автоматизации workflow с AI**, а также навыки:
+Необходимая переменная:
 
-* построения интеграционных workflow;
-* работы с Webhook и HTTP API;
-* работы с JSON и структурированными данными;
-* интеграции локальных LLM через Ollama;
-* обработки и валидации данных;
-* работы с PostgreSQL;
-* разработки REST API;
-* контейнеризации приложений;
-* тестирования API;
-* разделения ответственности между компонентами системы.
+```env
+JWT_SECRET_KEY=<локальный signing key>
+```
+
+Compose также поддерживает следующие переменные с безопасными значениями по умолчанию для issuer, audience и algorithm:
+
+```env
+JWT_ISSUER=AuthApi
+JWT_AUDIENCE=AuthApiClient
+JWT_ALGORITHM=HS256
+```
+
+`JWT_SECRET_KEY` передаётся Python как `JWT_SECRET_KEY` и AuthApi как `Jwt__Key`. Ключ должен быть одинаковым для обоих сервисов.
+
+### Запуск
+
+```bash
+docker compose up --build
+```
+
+Или в фоне:
+
+```bash
+docker compose up -d --build
+```
+
+Остановка без удаления данных:
+
+```bash
+docker compose stop
+```
+
+PostgreSQL имеет healthcheck:
+
+```text
+pg_isready -U analyzer -d request_analyzer
+```
+
+Python и AuthApi зависят от `postgres` с condition `service_healthy`, поэтому стартуют после готовности PostgreSQL. При запуске AuthApi вызывает `Database.Migrate()` и автоматически применяет отсутствующие EF Core migrations к базе `authapi`.
+
+### Сервисы и порты
+
+| Сервис | Назначение | Адрес |
+|---|---|---|
+| Python | FastAPI и веб-интерфейс | `http://localhost:8000` |
+| AuthApi | Регистрация, JWT и профиль | `http://localhost:5054` |
+| n8n | Workflow automation | `http://localhost:5678` |
+| PostgreSQL | Внутренняя база данных | `postgres:5432` внутри Compose-сети |
+
+PostgreSQL не публикуется отдельным host-портом в текущем Compose; сервисы подключаются к нему по имени `postgres`.
+
+## AuthApi
+
+Исходники находятся в `authapi/`. AuthApi использует ASP.NET Core, EF Core, Npgsql, BCrypt и JWT.
+
+### Endpoints
+
+| Метод | Endpoint | Назначение |
+|---|---|---|
+| `POST` | `/register` | Регистрация пользователя |
+| `POST` | `/login` | Проверка credentials и выдача access/refresh tokens |
+| `POST` | `/refresh` | Выдача нового access token по refresh token |
+| `POST` | `/logout` | Отзыв refresh token |
+| `GET` | `/profile` | Профиль текущего JWT-пользователя; требует authorization |
+
+JWT использует значения `Jwt:Key`, `Jwt:Issuer` и `Jwt:Audience`, передаваемые в контейнер через environment variables. Access token содержит identity claims пользователя и проверяется по issuer, audience, сроку действия и signing key.
+
+EF Core migrations находятся в `authapi/Migrations/`. При запуске приложения они применяются к базе `authapi` через `Database.Migrate()`.
+
+## Request Analyzer
+
+Python API находится в `python/` и запускается Uvicorn на порту `8000`.
+
+### Endpoints
+
+| Метод | Endpoint | Назначение |
+|---|---|---|
+| `GET` | `/` | Главная HTML-страница с login и формой обращения |
+| `POST` | `/analyze` | Обрезает и валидирует имя/сообщение, считает длину и слова |
+| `POST` | `/requests` | Сохраняет результат анализа в PostgreSQL; используется n8n |
+| `GET` | `/requests` | Возвращает историю; требует Bearer JWT |
+| `GET` | `/requests-page` | HTML-страница истории с login в браузере |
+
+На главной странице браузер получает access token через `POST http://localhost:5054/login`, хранит его только в памяти JavaScript и передаёт как `Authorization: Bearer ...` в n8n Webhook. n8n прокидывает исходный заголовок в Python `/analyze`. Страница истории аналогично получает токен через AuthApi и использует его при `GET /requests`.
+
+Передача заголовка в `/analyze` настроена для интеграционного потока, но сам endpoint `/analyze` сейчас не защищён JWT dependency. `POST /requests` также не защищён dependency и используется n8n для сохранения результата; JWT-защита применяется к `GET /requests`.
+
+Python подключается к базе `request_analyzer` через внутреннее имя Docker-сервиса `postgres`.
+
+## n8n
+
+Workflow находится в `n8n/request-analyzer.json`.
+
+Основной путь:
+
+```text
+Webhook POST /webhook/request-analyzer
+  -> HTTP Request POST http://host.docker.internal:8000/analyze
+  -> If
+  -> Analyze with AI -> Ollama qwen3:8b
+  -> Merge
+  -> HTTP Request POST http://python:8000/requests
+  -> Respond to Webhook
+```
+
+Webhook принимает JSON с `name` и `message`. HTTP Request для `/analyze` передаёт входящий `Authorization` без декодирования через выражение:
+
+```text
+$json.headers.authorization
+```
+
+После анализа workflow объединяет исходные данные с полями `category`, `priority`, `sentiment`, `summary` и `action`, сохраняет их через `POST /requests` и возвращает JSON-ответ браузеру.
+
+## База данных
+
+Один контейнер PostgreSQL содержит две базы:
+
+- `request_analyzer` — данные обращений Python API;
+- `authapi` — пользователи и refresh tokens AuthApi.
+
+База `authapi` создаётся init-скриптом `init-db/01-create-authapi.sql`. База `request_analyzer` создаётся через `POSTGRES_DB` в Compose.
+
+Основные таблицы:
+
+`request_analyzer`:
+
+- `requests` — обращение, исходный текст, метрики, категория, приоритет, тональность, резюме и действие.
+
+`authapi`:
+
+- `Users` — имя пользователя и хеш пароля;
+- `RefreshTokens` — refresh tokens, срок действия, отзыв и связь с пользователем;
+- `__EFMigrationsHistory` — история применённых EF Core migrations.
+
+## Разработка и тестирование
+
+Локальная установка Python-зависимостей описана в `python/requirements.txt`. Для запуска тестов используйте окружение проекта:
+
+```bash
+python -m pip install -r python/requirements.txt
+python -m pytest -q
+```
+
+Тесты находятся в `tests/` и проверяют `/analyze`, сохранение обращений и JWT-защиту `/requests`.
+
+Для проверки Docker-конфигурации без запуска контейнеров:
+
+```bash
+docker compose config
+```
+
+Для сборки AuthApi через Compose:
+
+```bash
+docker compose build authapi
+```
+
+Полный запуск и сборка всех сервисов:
+
+```bash
+docker compose up --build
+```
+
+## Безопасность
+
+- Не добавляйте в Git `.env`, реальные JWT signing keys, access tokens, refresh tokens или пароли.
+- Не переносите `appsettings.Development.json` с локальными секретами.
+- Не используйте реальные токены в `AuthApi.http` или других тестовых файлах.
+- `JWT_SECRET_KEY` должен задаваться через `.env` или внешнюю переменную окружения.
+- Для AuthApi ключ передаётся как `Jwt__Key`, для Python — как `JWT_SECRET_KEY`.
+- JWT проверяется по алгоритму HS256, issuer, audience, сроку действия и подписи.
+- PostgreSQL доступен сервисам внутри Compose-сети по адресу `postgres:5432`.
+- Для реального production-развёртывания секреты следует хранить во внешнем secret manager, а не в файлах проекта.
+
+## Docker Compose
+
+Docker Compose является основным способом запуска проекта. Он собирает `python/` и `authapi/`, запускает n8n и PostgreSQL, создаёт внутреннюю сеть, подключает volumes и управляет порядком запуска по healthcheck PostgreSQL.

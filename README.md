@@ -195,6 +195,24 @@ AuthApi публикует Swagger UI и OpenAPI JSON через Swashbuckle:
 - Swagger UI: `http://localhost:5054/swagger`;
 - OpenAPI JSON: `http://localhost:5054/swagger/v1/swagger.json`.
 
+## Screenshots
+
+### Request Analyzer Main Page
+
+![Request Analyzer Main Page](screenshots/main-page.png)
+
+### Request History
+
+![Request History](screenshots/requests-history.png)
+
+### AuthApi Swagger UI
+
+![AuthApi Swagger UI](screenshots/swagger.png)
+
+### n8n Workflow
+
+![n8n Workflow](screenshots/n8n-workflow.png)
+
 ## Request Analyzer
 
 Python API находится в `python/` и запускается Uvicorn на порту `8000`.

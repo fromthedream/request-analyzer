@@ -1,22 +1,23 @@
+import os
 import requests
 
 
-OLLAMA_URL = "http://localhost:11434/api/embed"
-MODEL = "nomic-embed-text"
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://localhost:11434"
+)
 
 
-def create_embedding(text: str) -> list[float]:
+def create_embedding(text: str):
+
     response = requests.post(
-        OLLAMA_URL,
+        f"{OLLAMA_URL}/api/embed",
         json={
-            "model": MODEL,
+            "model": "nomic-embed-text",
             "input": text
-        },
-        timeout=60
+        }
     )
 
     response.raise_for_status()
 
-    data = response.json()
-
-    return data["embeddings"][0]
+    return response.json()["embeddings"][0]

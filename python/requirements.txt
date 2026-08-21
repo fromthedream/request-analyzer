@@ -7,3 +7,4 @@ httpx
 PyJWT==2.10.1
 requests
 pgvector
+python-dotenv

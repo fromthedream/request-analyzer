@@ -1,5 +1,5 @@
 from pathlib import Path
-from chunking import split_text
+from knowledge.chunking import split_text
 from pathlib import Path
 
 print(Path(__file__).resolve())

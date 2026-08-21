@@ -9,6 +9,10 @@ from pydantic import BaseModel
 
 from database import Base, SessionLocal, engine
 from models import Request
+from knowledge.search import search_chunks
+import json
+
+from ai.analyzer import analyze_request
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,6 +22,21 @@ security = HTTPBearer()
 JWT_CLAIM_NAME_IDENTIFIER = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
 JWT_CLAIM_NAME = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
 
+class SearchRequest(BaseModel):
+    query: str
+
+
+@app.post("/knowledge/search")
+def knowledge_search(data: SearchRequest):
+
+    results = search_chunks(
+        data.query,
+        limit=3
+    )
+
+    return {
+        "results": results
+    }
 
 def get_jwt_settings() -> dict[str, str]:
     issuer = os.getenv("JWT_ISSUER")
@@ -546,3 +565,35 @@ def requests_page():
     </body>
     </html>
     """
+@app.post("/analyze-request")
+def analyze_request_endpoint(data: RequestData):
+
+    print("NAME:", data.name)
+    print("MESSAGE:", data.message)
+
+    results = search_chunks(
+        data.message,
+        limit=3
+    )
+
+    context = "\n\n".join(
+        item["content"]
+        for item in results
+    )
+
+
+    ai_result = analyze_request(
+        data.name,
+        data.message,
+        context
+    )
+
+
+    result = json.loads(ai_result)
+
+
+    return {
+        "name": data.name,
+        "message": data.message,
+        **result
+    }

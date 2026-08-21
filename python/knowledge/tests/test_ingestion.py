@@ -1,8 +1,8 @@
-from ingestion import ingest_document
+from knowledge.ingestion import ingest_document
 
 
 chunks = ingest_document(
-    "../../knowledge/documents/support_rules.md"
+    "knowledge/documents/support_rules.md"
 )
 
 

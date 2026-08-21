@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from chunking import split_text
-from embeddings import create_embedding
-
+from knowledge.chunking import split_text
+from knowledge.embeddings import create_embedding
 
 def ingest_document(file_path: str):
     path = Path(file_path)

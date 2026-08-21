@@ -1,10 +1,14 @@
-#Текст -> режем по 500 слов -> режем по 50 слов пересечения между кусками
-
 def split_text(
     text: str,
     chunk_size: int = 500,
     overlap: int = 50
 ) -> list[str]:
+
+    if overlap >= chunk_size:
+        raise ValueError(
+            "overlap must be smaller than chunk_size"
+        )
+
     words = text.split()
 
     chunks = []

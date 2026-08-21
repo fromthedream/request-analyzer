@@ -75,6 +75,7 @@ request-analyzer/
 - FastAPI, Uvicorn, Pydantic, SQLAlchemy;
 - n8n;
 - Ollama и модель `qwen3:8b`;
+- Swagger / OpenAPI через Swashbuckle;
 - Docker и Docker Compose;
 - pytest.
 
@@ -186,6 +187,13 @@ PostgreSQL не публикуется отдельным host-портом в �
 JWT использует значения `Jwt:Key`, `Jwt:Issuer` и `Jwt:Audience`, передаваемые в контейнер через environment variables. Access token содержит identity claims пользователя и проверяется по issuer, audience, сроку действия и signing key.
 
 EF Core migrations находятся в `authapi/Migrations/`. При запуске приложения они применяются к базе `authapi` через `Database.Migrate()`.
+
+### Swagger / OpenAPI
+
+AuthApi публикует Swagger UI и OpenAPI JSON через Swashbuckle:
+
+- Swagger UI: `http://localhost:5054/swagger`;
+- OpenAPI JSON: `http://localhost:5054/swagger/v1/swagger.json`.
 
 ## Request Analyzer
 

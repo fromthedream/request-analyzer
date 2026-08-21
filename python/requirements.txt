@@ -4,3 +4,4 @@ sqlalchemy
 psycopg2-binary
 pytest
 httpx
+PyJWT==2.10.1

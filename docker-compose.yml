@@ -2,8 +2,30 @@ services:
   python:
     build: ./python
     container_name: request-analyzer-python
+    environment:
+      JWT_ISSUER: ${JWT_ISSUER:-AuthApi}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-AuthApiClient}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     ports:
       - "8000:8000"
+
+  authapi:
+    build:
+      context: ../dev/AuthApi
+      dockerfile: Dockerfile
+    container_name: request-analyzer-authapi
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=authapi;Username=analyzer;Password=analyzer_password
+      Jwt__Key: ${JWT_SECRET_KEY}
+      Jwt__Issuer: ${JWT_ISSUER:-AuthApi}
+      Jwt__Audience: ${JWT_AUDIENCE:-AuthApiClient}
+    ports:
+      - "5054:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:16
@@ -12,8 +34,14 @@ services:
       POSTGRES_DB: request_analyzer
       POSTGRES_USER: analyzer
       POSTGRES_PASSWORD: analyzer_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analyzer -d request_analyzer"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
 
   n8n:
     image: docker.n8n.io/n8nio/n8n

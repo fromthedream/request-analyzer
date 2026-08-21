@@ -1,12 +1,89 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+import os
+from typing import Any
+
+import jwt
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse
-from database import engine, Base, SessionLocal
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
+
+from database import Base, SessionLocal, engine
 from models import Request
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+security = HTTPBearer()
+
+JWT_CLAIM_NAME_IDENTIFIER = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+JWT_CLAIM_NAME = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
+
+
+def get_jwt_settings() -> dict[str, str]:
+    issuer = os.getenv("JWT_ISSUER")
+    audience = os.getenv("JWT_AUDIENCE")
+    algorithm = os.getenv("JWT_ALGORITHM")
+    secret_key = os.getenv("JWT_SECRET_KEY")
+
+    if not issuer or not audience or not algorithm or not secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="JWT configuration is missing"
+        )
+
+    if algorithm != "HS256":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unsupported JWT algorithm"
+        )
+
+    return {
+        "issuer": issuer,
+        "audience": audience,
+        "algorithm": algorithm,
+        "secret_key": secret_key,
+    }
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict[str, Any]:
+    token = credentials.credentials
+    settings = get_jwt_settings()
+
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT") from exc
+
+    if header.get("alg") != settings["algorithm"]:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT algorithm")
+
+    try:
+        payload = jwt.decode(
+            token,
+            key=settings["secret_key"],
+            algorithms=[settings["algorithm"]],
+            issuer=settings["issuer"],
+            audience=settings["audience"],
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT expired") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT") from exc
+
+    user_id = payload.get(JWT_CLAIM_NAME_IDENTIFIER)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="JWT user identifier not found"
+        )
+
+    username = payload.get(JWT_CLAIM_NAME)
+    return {
+        "user_id": user_id,
+        "username": username,
+    }
 
 
 class RequestData(BaseModel):
@@ -64,6 +141,18 @@ def root():
     <body>
         <h1>Анализатор обращений</h1>
 
+        <form id="loginForm">
+    <label>Имя пользователя:</label><br>
+    <input type="text" id="username" required><br><br>
+
+    <label>Пароль:</label><br>
+    <input type="password" id="password" required><br><br>
+
+    <button type="submit">Войти</button>
+</form>
+
+<div id="authStatus"></div>
+
         <form id="requestForm">
     <label>Имя:</label><br>
     <input type="text" id="name" required><br><br>
@@ -77,8 +166,44 @@ def root():
 <div id="result"></div>
 
 <script>
+    let accessToken = null;
+
+    document.getElementById("loginForm").addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        const response = await fetch("http://localhost:5054/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username: document.getElementById("username").value,
+                password: document.getElementById("password").value
+            })
+        });
+
+        const authStatus = document.getElementById("authStatus");
+
+        if (!response.ok) {
+            accessToken = null;
+            authStatus.textContent = "Ошибка входа";
+            return;
+        }
+
+        const result = await response.json();
+        accessToken = result.accessToken;
+        authStatus.textContent = "Вход выполнен";
+    });
+
     document.getElementById("requestForm").addEventListener("submit", async function(event) {
         event.preventDefault();
+
+        const resultContainer = document.getElementById("result");
+
+        if (!accessToken) {
+            resultContainer.textContent = "Сначала войдите в систему";
+            return;
+        }
 
         const name = document.getElementById("name").value;
         const message = document.getElementById("message").value;
@@ -86,7 +211,8 @@ def root():
         const response = await fetch("http://localhost:5678/webhook/request-analyzer", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken}`
             },
             body: JSON.stringify({
                 name: name,
@@ -96,7 +222,6 @@ def root():
 
         const result = await response.json();
 
-        const resultContainer = document.getElementById("result");
         resultContainer.replaceChildren();
 
         const resultTitle = document.createElement("h2");
@@ -174,7 +299,9 @@ def analyze(data: RequestData):
         }
     }
 @app.get("/requests")
-def get_requests():
+def get_requests(current_user: dict[str, Any] = Depends(get_current_user)):
+    del current_user
+
     db = SessionLocal()
 
     try:
@@ -278,16 +405,73 @@ def requests_page():
 
         <h1>История обращений</h1>
 
+        <form id="loginForm">
+            <label>Имя пользователя:</label><br>
+            <input type="text" id="username" required><br><br>
+
+            <label>Пароль:</label><br>
+            <input type="password" id="password" required><br><br>
+
+            <button type="submit">Войти</button>
+        </form>
+
+        <div id="authStatus"></div>
+
         <div id="requests">
             Загрузка...
         </div>
 
         <script>
-            async function loadRequests() {
-                const response = await fetch("/requests");
-                const requests = await response.json();
+            let accessToken = null;
 
+            document.getElementById("loginForm").addEventListener("submit", async function(event) {
+                event.preventDefault();
+
+                const response = await fetch("http://localhost:5054/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        username: document.getElementById("username").value,
+                        password: document.getElementById("password").value
+                    })
+                });
+
+                const authStatus = document.getElementById("authStatus");
+
+                if (!response.ok) {
+                    accessToken = null;
+                    authStatus.textContent = "Ошибка входа";
+                    return;
+                }
+
+                const result = await response.json();
+                accessToken = result.accessToken;
+                authStatus.textContent = "Вход выполнен";
+                await loadRequests();
+            });
+
+            async function loadRequests() {
                 const container = document.getElementById("requests");
+
+                if (!accessToken) {
+                    container.textContent = "Сначала войдите в систему";
+                    return;
+                }
+
+                const response = await fetch("/requests", {
+                    headers: {
+                        "Authorization": `Bearer ${accessToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    container.textContent = "Не удалось загрузить историю обращений";
+                    return;
+                }
+
+                const requests = await response.json();
 
                 if (requests.length === 0) {
                     container.innerHTML = `

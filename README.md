@@ -8,7 +8,7 @@ Request Analyzer — система автоматического анализ�
 * ASP.NET Core AuthApi;
 * n8n workflow automation;
 * PostgreSQL;
-* Ollama с моделью `qwen3:8b`;
+* Ollama с моделью `qwen3:8b` и `nomic-embed-text`;
 * RAG pipeline для работы с базой знаний.
 
 Система принимает обращение пользователя через веб-интерфейс, выполняет AI-анализ с использованием локальной LLM и контекста из базы знаний, определяет категорию, приоритет и тональность, формирует краткое резюме и рекомендуемое действие, после чего сохраняет результат в PostgreSQL.
@@ -236,6 +236,8 @@ request-analyzer/
 
 * **Qwen3:8B** — локальная LLM для анализа обращений;
 
+* **nomic-embed-text** — embedding-модель, используется для преобразования пользовательских запросов и chunks базы знаний в векторы размерностью 768 для semantic search через pgvector.
+
 * **n8n** — workflow automation и интеграция сервисов;
 
 * **Swagger / OpenAPI** — документация AuthApi;
@@ -272,12 +274,14 @@ request-analyzer/
 
 * Docker Desktop с Docker Compose;
 * Ollama, запущенная на хост-системе;
-* модель Ollama `qwen3:8b`.
+* `qwen3:8b` — генеративная LLM;
+* `nomic-embed-text` — embedding-модель для RAG.
 
 Загрузка модели:
 
 ```bash
 ollama pull qwen3:8b
+ollama pull nomic-embed-text
 ```
 
 Python AI Service обращается к Ollama через:

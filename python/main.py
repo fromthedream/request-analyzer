@@ -5,7 +5,7 @@ import jwt
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import Base, SessionLocal, engine
 from models import Request
@@ -14,16 +14,47 @@ import json
 
 from ai.analyzer import analyze_request
 
+import logging
+import uuid
+
+from fastapi import Depends, FastAPI, HTTPException, Request as FastAPIRequest
+from fastapi.responses import HTMLResponse, JSONResponse
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 security = HTTPBearer()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+
+logger = logging.getLogger("request-analyzer")
 
 JWT_CLAIM_NAME_IDENTIFIER = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
 JWT_CLAIM_NAME = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
 
 class SearchRequest(BaseModel):
     query: str
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(
+    request: FastAPIRequest,
+    exc: Exception,
+):
+    logger.exception(
+        "Unhandled exception: %s %s",
+        request.method,
+        request.url.path,
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error"
+        },
+    )
 
 
 @app.post("/knowledge/search")
@@ -106,8 +137,8 @@ def get_current_user(
 
 
 class RequestData(BaseModel):
-    name: str
-    message: str
+    name: str = Field(min_length=1, max_length=100)
+    message: str = Field(min_length=1, max_length=5000)
 
 class RequestCreate(BaseModel):
     name: str
@@ -141,10 +172,25 @@ def create_request(data: RequestCreate):
         db.commit()
         db.refresh(request)
 
+        logger.info(
+            "Request saved successfully: id=%s",
+            request.id,
+        )
+
         return {
             "id": request.id,
             "status": "saved"
         }
+
+    except Exception:
+        db.rollback()
+
+        logger.exception(
+            "Failed to save request"
+        )
+
+        raise
+
     finally:
         db.close()
 
@@ -568,32 +614,73 @@ def requests_page():
 @app.post("/analyze-request")
 def analyze_request_endpoint(data: RequestData):
 
-    print("NAME:", data.name)
-    print("MESSAGE:", data.message)
+    name = data.name.strip()
+    message = data.message.strip()
 
-    results = search_chunks(
-        data.message,
-        limit=3
+    if not name:
+        raise HTTPException(
+            status_code=422,
+            detail="Name is empty"
+        )
+
+    if not message:
+        raise HTTPException(
+            status_code=422,
+            detail="Message is empty"
+        )
+
+    logger.info(
+        "Analysis started: name=%s, message_length=%s",
+        name,
+        len(message),
     )
 
-    context = "\n\n".join(
-        item["content"]
-        for item in results
-    )
+    try:
+        results = search_chunks(
+            message,
+            limit=3
+        )
 
+        logger.info(
+            "RAG retrieval completed: chunks=%s",
+            len(results),
+        )
 
-    ai_result = analyze_request(
-        data.name,
-        data.message,
-        context
-    )
+        context = "\n\n".join(
+            item["content"]
+            for item in results
+        )
 
+        ai_result = analyze_request(
+            name,
+            message,
+            context
+        )
 
-    result = json.loads(ai_result)
+        logger.info("LLM analysis completed")
 
+        result = json.loads(ai_result)
 
-    return {
-        "name": data.name,
-        "message": data.message,
-        **result
-    }
+        logger.info("Analysis result parsed successfully")
+
+        return {
+            "name": name,
+            "message": message,
+            **result
+        }
+
+    except json.JSONDecodeError:
+        logger.exception(
+            "LLM returned invalid JSON"
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="AI service returned invalid response"
+        )
+
+    except Exception:
+        logger.exception(
+            "Analysis failed"
+        )
+        raise
+    

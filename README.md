@@ -15,7 +15,7 @@ Request Analyzer — система автоматического анализ�
 
 Проект построен с разделением ответственности между сервисами:
 
-* **Python AI Service** отвечает за обработку обращений, AI-анализ, работу с RAG pipeline и взаимодействие с LLM.
+* **Python FastAPI API** принимает и валидирует обращения, выполняет AI-анализ с использованием RAG и локальной LLM, а также предоставляет endpoint для сохранения результатов анализа в PostgreSQL.
 * **n8n** используется как слой автоматизации workflow: принимает входящие запросы, вызывает Python API и возвращает результат.
 * **AuthApi** отвечает за регистрацию пользователей, JWT-аутентификацию, access/refresh tokens и управление профилем.
 * **PostgreSQL** используется для хранения данных обращений, пользователей, refresh tokens и базы знаний.
@@ -25,42 +25,51 @@ Request Analyzer — система автоматического анализ�
 
 ```text
 Browser
-
- |
- | POST /webhook/request-analyzer
- |
- v
-
+    |
+    | POST /webhook/request-analyzer
+    v
 n8n Workflow
-
- |
- | POST /analyze
- |
- v
-
+    |
+    | POST /analyze-request
+    v
 Python FastAPI API
+    |
+    +--> AI Analyzer
+    |       |
+    |       +--> RAG Search
+    |       |      |
+    |       |      +--> PostgreSQL + pgvector
+    |       |             |
+    |       |             +--> knowledge_chunks
+    |       |                    |
+    |       |                    +--> content
+    |       |                    +--> embedding vector(768)
+    |       |
+    |       +--> Ollama / qwen3:8b
+    |
+    v
+Analysis Result
+    |
+    +--------------------+
+    |                    |
+    v                    v
+n8n DB Preparation    Respond to Webhook
+    |
+    | POST /requests
+    v
+PostgreSQL request_analyzer
 
- |
- +--> AI Analyzer
- |      |
- |      +--> RAG Pipeline
- |      |      |
- |      |      +--> Document Ingestion
- |      |      |
- |      |      +--> Text Chunking
- |      |      |
- |      |      +--> Embeddings Generation
- |      |      |
- |      |      +--> PostgreSQL + pgvector
- |      |             |
- |      |             +--> knowledge_chunks
- |      |                  |
- |      |                  +--> content
- |      |                  +--> embedding vector(768)
- |      |
- |      +--> Ollama / qwen3:8b
- |
- +--> PostgreSQL request_analyzer
+
+Knowledge Base Preparation
+    |
+    +--> Document Ingestion
+    |
+    +--> Text Chunking
+    |
+    +--> Embeddings Generation
+    |
+    v
+PostgreSQL + pgvector
 
 
 Browser -- login --> AuthApi -- EF Core --> PostgreSQL authapi
@@ -79,7 +88,7 @@ Browser -- login --> AuthApi -- EF Core --> PostgreSQL authapi
   * принимает и валидирует обращения;
   * выполняет AI-анализ;
   * управляет RAG pipeline;
-  * получает релевантный контекст из vector database;
+  * получает релевантный контекст из PostgreSQL с использованием pgvector;
   * формирует запрос к локальной LLM;
   * сохраняет результаты анализа.
 
@@ -90,7 +99,7 @@ Browser -- login --> AuthApi -- EF Core --> PostgreSQL authapi
   * для каждого чанка создаются embeddings;
   * embeddings сохраняются в таблицу `knowledge_chunks`;
   * при анализе обращения выполняется vector similarity search;
-  * найденный контекст передаётся в LLM для формирования более точного ответа.
+  * найденные фрагменты добавляются в prompt и передаются локальной LLM как дополнительный контекст для анализа обращения.
 
 * **AuthApi** отвечает за:
 
@@ -520,7 +529,6 @@ Analysis Result
 | Метод | Endpoint | Назначение |
 | ------ | -------- | ---------- |
 | `GET` | `/` | Главная HTML-страница с login и формой обращения |
-| `POST` | `/analyze` | Валидация обращения и расчёт базовой статистики текста |
 | `POST` | `/analyze-request` | RAG-поиск, анализ обращения через LLM и возврат результата |
 | `POST` | `/requests` | Сохранение результата анализа в PostgreSQL; используется workflow |
 | `GET` | `/requests` | Возвращает историю обращений; требует Bearer JWT |
@@ -616,8 +624,6 @@ Python подключается к базе `request_analyzer` через вну
 postgres
 ```
 
-Передача JWT в `/analyze` используется для интеграционного workflow, однако сам endpoint сейчас не требует JWT dependency.
-
 `POST /requests` используется n8n для сохранения результата анализа. JWT-защита применяется к `GET /requests`.
 
 ## n8n
@@ -638,7 +644,7 @@ Webhook POST /webhook/request-analyzer
         |
         v
 
-HTTP Request POST /analyze
+HTTP Request POST /analyze-request
 
         |
         v

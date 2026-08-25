@@ -338,31 +338,6 @@ def root():
     </html>
     """
 
-
-@app.post("/analyze")
-def analyze(data: RequestData):
-    name = data.name.strip()
-    message = data.message.strip()
-
-    if not message:
-        return {
-            "valid": False,
-            "data": None,
-            "error": "Message is empty"
-        }
-
-    text_length = len(message)
-    word_count = len(message.split())
-
-    return {
-        "valid": True,
-        "data": {
-            "name": name,
-            "message": message,
-            "text_length": text_length,
-            "word_count": word_count
-        }
-    }
 @app.get("/requests")
 def get_requests(current_user: dict[str, Any] = Depends(get_current_user)):
     del current_user
